@@ -12,6 +12,7 @@ from fastapi.responses import FileResponse
 from app.models import Admin, Host, Category, Set, Card, Game, Base
 from app.database import SessionLocal, engine
 from app.schemas import UserCreate, UserLogin, CategoryCreate, SetCreate, CardCreate, GameCreate
+from app.utils import create_access_token, get_current_user
 
 app = FastAPI()
 
@@ -49,13 +50,18 @@ async def admin_login(admin: UserLogin, db: Session = Depends(get_db)):
     if not adm:
         raise HTTPException(status_code=401, detail="Incorrect user")
     print(admin.login, admin.password)
-    return {"message": "Login successful", "user_id": adm.id}
+    if admin.password != adm.password:
+        raise HTTPException(status_code=401, detail="Incorrect password")
+
+    # Генерация JWT токена
+    access_token = create_access_token(data={"sub": adm.login})
+    return {"access_token": access_token, "token_type": "bearer"}
 
 
 # Вход ведущего
 @app.post("/host-login")
 async def register_admin(host: UserLogin, db: Session = Depends(get_db)):
-    h = db.query(Admin).filter(Admin.login == host.login).first()
+    h = db.query(Host).filter(Host.login == host.login).first()
     if not h:
         raise HTTPException(status_code=401, detail="Incorrect user")
     print(host.login, host.password)
@@ -64,7 +70,10 @@ async def register_admin(host: UserLogin, db: Session = Depends(get_db)):
 
 # Создание категории
 @app.post("/admin/new-category")
-async def create_category(category: CategoryCreate, db: Session = Depends(get_db)):
+async def create_category(category: CategoryCreate, db: Session = Depends(get_db),
+                          current_user: dict = Depends(get_current_user)):
+    if not current_user or current_user.get("sub") != "admin":
+        raise HTTPException(status_code=403, detail="Permission denied")
     new_category = Category(name=category.name, color=category.color)
     db.add(new_category)
     db.commit()
@@ -72,8 +81,12 @@ async def create_category(category: CategoryCreate, db: Session = Depends(get_db
     return {"message": "Category created successfully!", "category_id": new_category.id}
 
 
+# Изменение категории
 @app.post("/admin/category")
-async def edit_category(category_id: int, category: CategoryCreate, db: Session = Depends(get_db)):
+async def edit_category(category_id: int, category: CategoryCreate, db: Session = Depends(get_db),
+                        current_user: dict = Depends(get_current_user)):
+    if not current_user or current_user.get("sub") != "admin":
+        raise HTTPException(status_code=403, detail="Permission denied")
     # Поиск категории по ID
     db_category = db.query(Category).filter(Category.id == category_id).first()
 
@@ -99,7 +112,10 @@ async def edit_category(category_id: int, category: CategoryCreate, db: Session 
 
 # Создание набора
 @app.post("/admin/set/")
-async def create_set(set_data: SetCreate, db: Session = Depends(get_db)):
+async def create_set(set_data: SetCreate, db: Session = Depends(get_db),
+                     current_user: dict = Depends(get_current_user)):
+    if not current_user or current_user.get("sub") != "admin":
+        raise HTTPException(status_code=403, detail="Permission denied")
     new_set = Set(name=set_data.name, category_id=set_data.category_id)
     db.add(new_set)
     db.commit()
@@ -128,10 +144,12 @@ async def create_card(card_data: CardCreate, db: Session = Depends(get_db)):
 
 # Изменение игры
 @app.post("/admin/edit-game")
-async def edit_game():
+async def edit_game(game_data: GameCreate, db: Session = Depends(get_db),
+                    current_user: dict = Depends(get_current_user)):
     pass
 
 
+# Создание игры
 @app.post("/admin/new-game")
 async def new_game(game_data: GameCreate, db: Session = Depends(get_db)):
     # Генерация уникального кода для игры
@@ -161,9 +179,12 @@ async def new_game(game_data: GameCreate, db: Session = Depends(get_db)):
     }
 
 
-# Создание игры
-@app.post("/admin/game/start")
-async def start_game(game_data: GameCreate, db: Session = Depends(get_db)):
+# Начало игры
+@app.post("/host/game/start")
+async def start_game(game_data: GameCreate, db: Session = Depends(get_db),
+                     current_user: dict = Depends(get_current_user)):
+    if not current_user or current_user.get("sub") != "host":
+        raise HTTPException(status_code=403, detail="Permission denied")
     game_code = str(uuid.uuid4())  # Генерация уникального кода игры
     new_game = Game(game_code=game_code, host_id=game_data.host_id)
     db.add(new_game)
@@ -172,7 +193,13 @@ async def start_game(game_data: GameCreate, db: Session = Depends(get_db)):
     return {"message": "Game started successfully!", "game_code": game_code}
 
 
-# Генерация QR
+''''@app.get("/host/game{gameid}/play")
+async def play_game(game_data: GameCreate, db: Session = Depends(get_db),
+                    current_user: dict = Depends(get_current_user)):
+    if not current_user or current_user.get("sub") != "host":
+        raise HTTPException(status_code=403, detail="Permission denied")'''
+
+'''# Генерация QR
 @app.get("/admin/game/{game_code}/qr")
 async def generate_qr(game_code: str):
     # Генерация QR-кода
@@ -187,4 +214,4 @@ async def generate_qr(game_code: str):
     qr_base64 = base64.b64encode(img_io.getvalue()).decode("utf-8")
 
     # Отправляем на фронтенд
-    return JSONResponse(content={"message": "QR code generated", "qr_code": qr_base64})
+    return JSONResponse(content={"message": "QR code generated", "qr_code": qr_base64})'''
