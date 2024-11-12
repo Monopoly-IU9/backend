@@ -11,6 +11,11 @@ def create_category(db: Session, category: schemas.CategoryCreate):
     return db_category
 
 
+# Получение админа
+def get_admin(db: Session, admin: schemas.UserLogin):
+    return db.query(models.Admin).filter(admin.login == models.Admin.login).first()
+
+
 # Получение всех категорий
 def get_categories(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.Category).offset(skip).limit(limit).all()

@@ -51,7 +51,7 @@ class Card(Base):
     __tablename__ = "cards"
     number = Column(Integer, primary_key=True, index=True)
     description = Column(String)
-    hashtags = Column(String)  # Простой текст с хештегами, можно улучшить если нужно
+    hashtags = Column(String)
 
     set_id = Column(Integer, ForeignKey("sets.id"))
     set = relationship("Set", back_populates="cards")
@@ -63,6 +63,6 @@ class Game(Base):
     id = Column(Integer, primary_key=True, index=True)
     game_code = Column(String, unique=True, index=True)
     status = Column(String, default="waiting")  # Статус игры (waiting, started, finished)
-    host_id = Column(Integer, ForeignKey("hosts.id"))
 
+    host_id = Column(Integer, ForeignKey("hosts.id"))
     host = relationship("Host")

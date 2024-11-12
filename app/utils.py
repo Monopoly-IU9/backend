@@ -46,3 +46,5 @@ def get_user(db, username: str):
     if username in db:
         return db[username]
     return None
+
+
