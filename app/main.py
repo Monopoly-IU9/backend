@@ -1,18 +1,12 @@
-import base64
-import io
-
-from fastapi import FastAPI, HTTPException, Depends
-from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import exc
-# import bcrypt
 import uuid
-import qrcode
 from fastapi.responses import FileResponse
 from app.models import Admin, Host, Category, Set, Card, Game, Base
 from app.database import SessionLocal, engine
-from app.schemas import UserCreate, UserLogin, CategoryCreate, SetCreate, CardCreate, GameCreate
-from app.utils import create_access_token, get_current_user
+from app.schemas import UserLogin, CategoryCreate, SetCreate, CardCreate, GameCreate
+from app.utils import create_access_token, get_current_user, oauth2_scheme, verify_access_token
+from fastapi import FastAPI, Depends, HTTPException, status
 
 app = FastAPI()
 
@@ -109,7 +103,6 @@ async def create_set(set_data: SetCreate, db: Session = Depends(get_db),
     db.refresh(new_set)
     return {"message": "Set created successfully!", "set_id": new_set.id}'''
 
-
 ''''# Создание карточки
 @app.post("/admin/card/")
 async def create_card(card_data: CardCreate, db: Session = Depends(get_db)):
@@ -128,6 +121,7 @@ async def create_card(card_data: CardCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Error occurred while creating the card")
     return {"message": "Card created successfully!", "card_id": new_card.number}
 '''
+
 
 # Изменение игры
 @app.post("/admin/edit-game")
@@ -206,10 +200,7 @@ async def generate_qr(game_code: str):
 
 # Получение списка категорий
 @app.get("/admin/getCategories")
-async def get_categories(db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    if not current_user or current_user.get("sub") != "admin":
-        raise HTTPException(status_code=403, detail="Permission denied")
-
+async def get_categories(db: Session = Depends(get_db)):
     categories = db.query(Category).all()
     return [{"id": category.id, "name": category.name, "color": category.color} for category in categories]
 
@@ -395,3 +386,22 @@ async def delete_set(set_id: int, db: Session = Depends(get_db)):
     db.commit()
 
     return {"message": "Set and all associated cards deleted successfully!"}
+
+
+# Ручка для проверки авторизации ведущего
+@app.get("/check-auth")
+async def check_auth(token: str = Depends(oauth2_scheme)):
+    payload = verify_access_token(token)
+    if payload.get("role") != "host":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not a host")
+    return {"status": "authorized"}
+
+
+# Ручка для проверки авторизации администратора
+@app.get("/check-admin-auth")
+async def check_admin_auth(token: str = Depends(oauth2_scheme)):
+    payload = verify_access_token(token)
+    if payload.get("role") != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not an admin")
+    return {"status": "authorized"}
+
