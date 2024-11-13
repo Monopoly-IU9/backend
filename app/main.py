@@ -164,7 +164,8 @@ async def add_card_to_category(category_id: int, card_data: CardCreate, db: Sess
         number=card_data.number,
         description=card_data.description,
         hashtags=",".join(card_data.hashtags),
-        set_id=main_set.id
+        set_id=main_set.id,
+        category_id=category_id
     )
     db.add(new_card)
     db.commit()
