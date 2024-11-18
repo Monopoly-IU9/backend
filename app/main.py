@@ -5,7 +5,7 @@ from fastapi.responses import FileResponse
 from fastapi import FastAPI, Depends, HTTPException, status
 from app.models import Admin, Host, Category, Set, Card, Game, Base
 from app.database import SessionLocal, engine
-from app.schemas import UserLogin, CategoryCreate, SetCreate, CardCreate, GameCreate
+from app.schemas import UserLogin, CategoryCreate, SetCreate, CardCreate, GameCreate, UserCreate
 
 from app.utils import create_access_token
 
@@ -231,3 +231,28 @@ async def delete_set(set_id: int, db: Session = Depends(get_db)):
     db.commit()
 
     return {"message": "Set and all associated cards deleted successfully!"}
+
+
+# Создание ведущего
+@app.post("/admin/createHost")
+def create_host(host: UserCreate, db: Session = Depends(get_db)):
+    new_host = Host(login=host.login, password=host.password)
+    db.add(new_host)
+    db.commit()
+    db.refresh(new_host)
+    return {"message": "Host created successfully!", "host_id": new_host.id}
+
+
+# Получение информации о карте
+@app.post("/admin/getCardInfo")
+def get_card_info(card_id: int, db: Session = Depends(get_db)):
+    card_info = db.query(Card).filter(Card.id == card_id).first()
+    if not card_info:
+        raise HTTPException(status_code=404, detail="Card not found")
+
+    card_data = {
+        "number": f'{card_info.category_id}.{card_info.number}',
+        "description": card_info.description,
+    }
+
+    return card_data

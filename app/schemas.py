@@ -10,7 +10,8 @@ class UserBase(BaseModel):
 
 # Модель для создания нового пользователя (админа или ведущего)
 class UserCreate(UserBase):
-    pass
+    login: str
+    password: str
 
 
 # Модель для логина пользователя
