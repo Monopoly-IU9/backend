@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, Depends, HTTPException
 from app.models import Admin, Host, Category, Set, Card, Game, Base
 from app.database import SessionLocal, engine
-from app.schemas import UserLogin, CategoryCreate, CardCreate, GameCreate, UserCreate
+from app.schemas import UserLogin, CategoryCreate, CardCreate, GameCreate, UserCreate, SetCreate
 from app.utils import create_access_token, verify_access_token  # oauth2_scheme,
 from fastapi.security import OAuth2PasswordBearer
 
@@ -101,6 +101,36 @@ async def edit_category(category_id: int, category: CategoryCreate, db: Session 
     db.refresh(db_category)
 
     return {"message": "Category updated successfully!", "category_id": db_category.id}
+
+
+@app.post("/admin/editSet")
+async def edit_set(s: SetCreate, db: Session = Depends(get_db)):
+    db_set = db.query(Set).filter(Set.id == s.id).first()
+    if not db_set:
+        raise HTTPException(status_code=404, detail="Set not found")
+
+    db_set.name = s.name
+    db_set.cards = s.cards
+    db_set.category_id = s.category_id
+    db.commit()
+    db.refresh(db_set)
+    return {"message": "Set updated successfully!", "set_id": db_set.id}
+
+
+@app.post("/admin/editCard")
+async def edit_card(card: CardCreate, db: Session = Depends(get_db)):
+    db_card = db.query(Card).filter(Card.id == card.id).first()
+    if not db_card:
+        raise HTTPException(status_code=404, detail="Card not found")
+    db_card.number = card.number
+    db_card.description = card.description
+    db_card.hashtags = ",".join(card.hashtags)
+    db_card.set_id = card.set_id
+
+    db.commit()
+    db.refresh(db_card)
+
+    return {"message": "Card updated successfully!", "card_id": db_card.id}
 
 
 # Создание игры

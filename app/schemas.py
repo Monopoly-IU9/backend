@@ -26,14 +26,9 @@ class CategoryCreate(BaseModel):
     color: str
 
 
-# Модель для создания набора
-class SetCreate(BaseModel):
-    name: str
-    category_id: int  # ID категории, к которой принадлежит набор
-
-
 # Модель для создания карточки
 class CardCreate(BaseModel):
+    id: int
     number: int
     description: str
     hashtags: List[str]  # Список хештегов
@@ -61,17 +56,21 @@ class Category(BaseModel):
         orm_mode = True
 
 
+class SetCreate(BaseModel):
+    id: int
+    name: str
+    category_id: int
+    cards: List[int] = []
+
+
 # Схема для отображения набора
 class Set(BaseModel):
     id: int
     name: str
     category_id: int
-    # Связь с категорией
-    category: Category
+
     # Связь многие-ко-многим с карточками
-    cards: List["Card"] = []  # Список карточек, связанных с набором
-    # Связь многие-ко-многим с играми
-    games: List["Game"] = []  # Список игр, связанных с набором
+    cards: List[int] = []  # Список карточек, связанных с набором
 
     class Config:
         orm_mode = True
