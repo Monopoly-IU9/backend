@@ -76,7 +76,7 @@ async def register_admin(host: UserLogin, db: Session = Depends(get_db)):
 
 
 # Изменение категории
-@app.post("/admin/category")
+@app.post("/admin/editCategory")
 async def edit_category(category_id: int, category: CategoryCreate, db: Session = Depends(get_db),
                         token: str = Depends(oauth2_scheme)):
     verify_access_token(token)
