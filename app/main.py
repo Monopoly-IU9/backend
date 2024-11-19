@@ -26,7 +26,7 @@ app.add_middleware(
 # Инициализация базы данных
 Base.metadata.create_all(bind=engine)
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/token", scheme_name="JWT")
 
 
 # Получение сессии базы данных
@@ -55,9 +55,8 @@ async def admin_login(admin: UserLogin, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Incorrect password")
 
     # Генерация JWT токена
-    access_token = create_access_token(data={"sub": adm.login})
-    while access_token in blacklist:
-        access_token = create_access_token(data={"sub": adm.login})
+    while (access_token := create_access_token(data={"sub": adm.login})) in blacklist:
+        continue
     return {"access_token": access_token, "token_type": "bearer"}
 
 
@@ -71,9 +70,8 @@ async def register_admin(host: UserLogin, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Incorrect password")
 
     # Генерация JWT токена
-    access_token = create_access_token(data={"sub": h.login})
-    while access_token in blacklist:
-        access_token = create_access_token(data={"sub": h.login})
+    while (access_token := create_access_token(data={"sub": h.login})) in blacklist:
+        continue
     return {"access_token": access_token, "token_type": "bearer"}
 
 
@@ -203,6 +201,7 @@ async def add_card_to_category(category_id: int, card_data: CardCreate, db: Sess
 
 
 # Удаление категории
+# TODO(исправить category_id)
 @app.post("/admin/deleteCategory")
 async def delete_category(category_id: int, db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
     verify_access_token(token)
@@ -288,7 +287,31 @@ async def get_card_info(card_id: int, db: Session = Depends(get_db), token: str 
         "description": card_info.description,
     }
 
-    return card_data
+    return {"card_data": card_data}
+
+
+@app.get("/admin/getCategoryData")
+async def get_category_data(category_id: int, db: Session = Depends(get_db)):
+    # verify_access_token(token)
+    category_data = db.query(Category).filter(category_id == Category.id).first()
+    cards = category_data.cards
+    sets = category_data.sets
+    card_data = []
+    set_data = []
+    for card in cards:
+        card_data.append({
+            "id": card.id,
+            "description": card.description,
+            "tags": card.hashtags
+        })
+
+    for set in sets:
+        if not (set.name.startswith("Main Set")):
+            set_data.append({
+                "id": set.id,
+                "name": set.name,
+            })
+    return {"name": category_data.name, "color": category_data.color, "cards": card_data, "sets": set_data}
 
 
 @app.post("/admin/editGame")
@@ -324,3 +347,19 @@ async def check_auth(token: str = Depends(oauth2_scheme)):
     if username != "host":
         raise HTTPException(status_code=403, detail="Host privileges required")
     return {"message": "Host is authorized"}
+
+
+from fastapi import Form
+
+
+# Эндпоинт для получения токена
+@app.post("/token")
+async def login(form_data: UserLogin, db: Session = Depends(get_db)):
+    # Поиск пользователя в базе данных
+    adm = db.query(Admin).filter(Admin.login == form_data.login).first()
+
+    if not adm:
+        raise HTTPException(status_code=401, detail="Incorrect username or password")
+
+    access_token = create_access_token(data={"sub": adm.login})
+    return {"access_token": access_token, "token_type": "bearer"}

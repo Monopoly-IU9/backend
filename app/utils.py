@@ -11,7 +11,7 @@ SECRET_KEY = "9d5f2b2e6f5a2e7b788d9e4e7e07c4b3a6a01f44b5e74fb87a8232c2f4ab27a1"
 ALGORITHM = "HS256"
 
 # OAuth2PasswordBearer - стандартная схема для получения токена из заголовков
-#oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/admin-login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/token")
 
 
 # Функция для создания JWT токена
