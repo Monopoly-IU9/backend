@@ -49,7 +49,11 @@ async def register_admin(host: UserLogin, db: Session = Depends(get_db)):
     h = db.query(Host).filter(Host.login == host.login).first()
     if not h:
         raise HTTPException(status_code=401, detail="Incorrect user")
-    return {"message": "Login successful", "user_id": h.id}
+    if h.password != host.password:
+        raise HTTPException(status_code=401, detail="Incorrect password")
+
+    access_token = create_access_token(data={"sub": h.login})
+    return {"access_token": access_token, "token_type": "bearer"}
 
 
 # Изменение категории
