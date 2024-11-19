@@ -13,8 +13,7 @@ from app.utils import create_access_token
 app = FastAPI()
 
 origins = [
-    "http://localhost",
-    "http://localhost:8000"
+    "*"
 ]
 
 app.add_middleware(
