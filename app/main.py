@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import exc
 import uuid
 from fastapi.responses import FileResponse
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, Depends, HTTPException, status
 from app.models import Admin, Host, Category, Set, Card, Game, Base
 from app.database import SessionLocal, engine
@@ -10,6 +11,19 @@ from app.schemas import UserLogin, CategoryCreate, SetCreate, CardCreate, GameCr
 from app.utils import create_access_token
 
 app = FastAPI()
+
+origins = [
+    "http://localhost",
+    "http://localhost:8000"
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Инициализация базы данных
 Base.metadata.create_all(bind=engine)
