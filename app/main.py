@@ -44,7 +44,7 @@ async def root():
 
 
 # Вход админа
-@app.post("/admin-login")
+@app.post("/admin/login")
 async def admin_login(admin: UserLogin, db: Session = Depends(get_db)):
     adm = db.query(Admin).filter(Admin.login == admin.login).first()
     if not (admin.login == "admin" and admin.password == "12345678"):
@@ -61,7 +61,7 @@ async def admin_login(admin: UserLogin, db: Session = Depends(get_db)):
 
 
 # Вход ведущего
-@app.post("/host-login")
+@app.post("/host/login")
 async def register_admin(host: UserLogin, db: Session = Depends(get_db)):
     h = db.query(Host).filter(Host.login == host.login).first()
     if not h:
@@ -349,21 +349,21 @@ async def edit_game(db: Session = Depends(get_db)):
     pass
 
 
-@app.get("/admin-logout")
+@app.get("/admin/logout")
 async def admin_logout(token: str):
     verify_access_token(token)
     blacklist.add(token)
     return {"message": "Admin logged out successfully"}
 
 
-@app.get("/host-logout")
+@app.get("/host/logout")
 async def host_logout(token: str):
     verify_access_token(token)
     blacklist.add(token)
     return {"message": "Host logged out successfully"}
 
 
-@app.post("/checkAuthAdmin")
+@app.post("/admin/checkAuth")
 async def check_auth_admin(token: str = Depends(oauth2_scheme)):
     username = verify_access_token(token)
     if username != "admin":
@@ -371,7 +371,7 @@ async def check_auth_admin(token: str = Depends(oauth2_scheme)):
     return {"message": "Admin is authorized"}
 
 
-@app.post("/checkAuth")
+@app.post("/host/checkAuth")
 async def check_auth(token: str = Depends(oauth2_scheme)):
     username = verify_access_token(token)
     if username != "host":
