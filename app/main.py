@@ -47,6 +47,8 @@ async def root():
 @app.post("/admin-login")
 async def admin_login(admin: UserLogin, db: Session = Depends(get_db)):
     adm = db.query(Admin).filter(Admin.login == admin.login).first()
+    if not (admin.login == "admin" and admin.password == "12345678"):
+        raise HTTPException(status_code=401, detail="Incorrect user")
     if not adm:
         raise HTTPException(status_code=401, detail="Incorrect user")
     if admin.password != adm.password:
