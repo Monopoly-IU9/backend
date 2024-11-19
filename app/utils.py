@@ -11,7 +11,7 @@ SECRET_KEY = "9d5f2b2e6f5a2e7b788d9e4e7e07c4b3a6a01f44b5e74fb87a8232c2f4ab27a1"
 ALGORITHM = "HS256"
 
 # OAuth2PasswordBearer - стандартная схема для получения токена из заголовков
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="admin-login")
+#oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/admin-login")
 
 
 # Функция для создания JWT токена
@@ -31,14 +31,15 @@ def verify_access_token(token: str):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username = payload.get("sub")
+        print(username)
     except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
     return username
 
 
-def get_current_user(token: str = Security(oauth2_scheme)):
+'''def get_current_user(token: str = Security(oauth2_scheme)):
     try:
         payload = verify_access_token(token)
         return payload  # Возвращаем данные о пользователе
     except HTTPException:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
+        raise HTTPException(status_code=401, detail="Invalid or expired token")'''

@@ -6,7 +6,8 @@ from fastapi import FastAPI, Depends, HTTPException
 from app.models import Admin, Host, Category, Set, Card, Game, Base
 from app.database import SessionLocal, engine
 from app.schemas import UserLogin, CategoryCreate, CardCreate, GameCreate, UserCreate
-from app.utils import create_access_token, oauth2_scheme, verify_access_token
+from app.utils import create_access_token, verify_access_token  # oauth2_scheme,
+from fastapi.security import OAuth2PasswordBearer
 
 app = FastAPI()
 blacklist = set()
@@ -24,6 +25,8 @@ app.add_middleware(
 
 # Инициализация базы данных
 Base.metadata.create_all(bind=engine)
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
 # Получение сессии базы данных
@@ -305,3 +308,19 @@ async def host_logout(token: str):
     verify_access_token(token)
     blacklist.add(token)
     return {"message": "Host logged out successfully"}
+
+
+@app.post("/checkAuthAdmin")
+async def check_auth_admin(token: str = Depends(oauth2_scheme)):
+    username = verify_access_token(token)
+    if username != "admin":
+        raise HTTPException(status_code=403, detail="Admin privileges required")
+    return {"message": "Admin is authorized"}
+
+
+@app.post("/checkAuth")
+async def check_auth(token: str = Depends(oauth2_scheme)):
+    username = verify_access_token(token)
+    if username != "host":
+        raise HTTPException(status_code=403, detail="Host privileges required")
+    return {"message": "Host is authorized"}
