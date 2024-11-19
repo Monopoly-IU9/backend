@@ -4,6 +4,8 @@ from fastapi import HTTPException, Security
 from fastapi.security import OAuth2PasswordBearer
 from typing import Optional
 
+from sqlalchemy.orm import Session
+
 # Секретный ключ для подписывания токенов
 SECRET_KEY = "9d5f2b2e6f5a2e7b788d9e4e7e07c4b3a6a01f44b5e74fb87a8232c2f4ab27a1"
 ALGORITHM = "HS256"
@@ -28,9 +30,10 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
 def verify_access_token(token: str):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        return payload
+        username = payload.get("sub")
     except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
+    return username
 
 
 def get_current_user(token: str = Security(oauth2_scheme)):

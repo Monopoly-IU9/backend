@@ -42,8 +42,7 @@ class CardCreate(BaseModel):
 
 # Модель для создания игры
 class GameCreate(BaseModel):
-    host_id: int  # ID ведущего
-    game_code: str  # Уникальный код игры
+    name: str
 
 
 # Схема для отображения информации о категории

@@ -1,17 +1,15 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import exc
-import uuid
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException
 from app.models import Admin, Host, Category, Set, Card, Game, Base
 from app.database import SessionLocal, engine
-from app.schemas import UserLogin, CategoryCreate, SetCreate, CardCreate, GameCreate, UserCreate
-
-from app.utils import create_access_token
+from app.schemas import UserLogin, CategoryCreate, CardCreate, GameCreate, UserCreate
+from app.utils import create_access_token, oauth2_scheme, verify_access_token
 
 app = FastAPI()
-
+blacklist = set()
 origins = [
     "*"
 ]
@@ -55,6 +53,8 @@ async def admin_login(admin: UserLogin, db: Session = Depends(get_db)):
 
     # Генерация JWT токена
     access_token = create_access_token(data={"sub": adm.login})
+    while access_token in blacklist:
+        access_token = create_access_token(data={"sub": adm.login})
     return {"access_token": access_token, "token_type": "bearer"}
 
 
@@ -67,13 +67,18 @@ async def register_admin(host: UserLogin, db: Session = Depends(get_db)):
     if h.password != host.password:
         raise HTTPException(status_code=401, detail="Incorrect password")
 
+    # Генерация JWT токена
     access_token = create_access_token(data={"sub": h.login})
+    while access_token in blacklist:
+        access_token = create_access_token(data={"sub": h.login})
     return {"access_token": access_token, "token_type": "bearer"}
 
 
 # Изменение категории
 @app.post("/admin/category")
-async def edit_category(category_id: int, category: CategoryCreate, db: Session = Depends(get_db)):
+async def edit_category(category_id: int, category: CategoryCreate, db: Session = Depends(get_db),
+                        token: str = Depends(oauth2_scheme)):
+    verify_access_token(token)
     # Поиск категории по ID
     db_category = db.query(Category).filter(Category.id == category_id).first()
 
@@ -99,14 +104,11 @@ async def edit_category(category_id: int, category: CategoryCreate, db: Session 
 
 # Создание игры
 @app.post("/admin/new-game")
-async def new_game(game_data: GameCreate, db: Session = Depends(get_db)):
-    # Генерация уникального кода для игры
-    game_code = str(uuid.uuid4())  # Генерация уникального кода игры
-
+async def new_game(game_data: GameCreate, db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
+    verify_access_token(token)
     # Создание нового игрового объекта
     new_game = Game(
-        game_code=game_code,  # Уникальный код игры
-        host_id=game_data.host_id  # ID ведущего (хоста)
+        name=game_data.name
     )
 
     # Добавление игры в базу данных
@@ -122,21 +124,22 @@ async def new_game(game_data: GameCreate, db: Session = Depends(get_db)):
     # Возвращаем информацию о созданной игре (код игры и ID хоста)
     return {
         "message": "Game created successfully!",
-        "game_code": new_game.game_code,
-        "host_id": new_game.host_id
+        "name": new_game.name
     }
 
 
 # Получение списка категорий
 @app.get("/admin/getCategories")
-async def get_categories(db: Session = Depends(get_db)):
+async def get_categories(db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
+    verify_access_token(token)
     categories = db.query(Category).all()
     return [{"id": category.id, "name": category.name, "color": category.color} for category in categories]
 
 
 # Создание категории
 @app.post("/admin/createCategory")
-async def create_category(category: CategoryCreate, db: Session = Depends(get_db)):
+async def create_category(category: CategoryCreate, db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
+    verify_access_token(token)
     new_category = Category(name=category.name, color=category.color)
     db.add(new_category)
     db.commit()
@@ -146,7 +149,8 @@ async def create_category(category: CategoryCreate, db: Session = Depends(get_db
 
 # Получение информации о наборе
 @app.post("/admin/getSetInfo")
-async def get_set_info(set_id: int, db: Session = Depends(get_db)):
+async def get_set_info(set_id: int, db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
+    verify_access_token(token)
     set_info = db.query(Set).filter(Set.id == set_id).first()
     if not set_info:
         raise HTTPException(status_code=404, detail="Set not found")
@@ -164,7 +168,9 @@ async def get_set_info(set_id: int, db: Session = Depends(get_db)):
 
 # Создание карточки
 @app.post("/admin/addCardToCategoryID")
-async def add_card_to_category(category_id: int, card_data: CardCreate, db: Session = Depends(get_db)):
+async def add_card_to_category(category_id: int, card_data: CardCreate, db: Session = Depends(get_db),
+                               token: str = Depends(oauth2_scheme)):
+    verify_access_token(token)
     # Проверка существования категории
     category = db.query(Category).filter(Category.id == category_id).first()
     if not category:
@@ -195,7 +201,8 @@ async def add_card_to_category(category_id: int, card_data: CardCreate, db: Sess
 
 # Удаление категории
 @app.post("/admin/deleteCategory")
-async def delete_category(category_id: int, db: Session = Depends(get_db)):
+async def delete_category(category_id: int, db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
+    verify_access_token(token)
     # Получаем категорию по id
     category = db.query(Category).filter(Category.id == category_id).first()
     if not category:
@@ -219,7 +226,8 @@ async def delete_category(category_id: int, db: Session = Depends(get_db)):
 
 # Удаление карточки
 @app.post("/admin/deleteCard")
-async def delete_card(card_id: int, db: Session = Depends(get_db)):
+async def delete_card(card_id: int, db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
+    verify_access_token(token)
     # Находим карточку по id
     card = db.query(Card).filter(Card.number == card_id).first()
     if not card:
@@ -234,7 +242,8 @@ async def delete_card(card_id: int, db: Session = Depends(get_db)):
 
 # Удаление набора
 @app.post("/admin/deleteSet")
-async def delete_set(set_id: int, db: Session = Depends(get_db)):
+async def delete_set(set_id: int, db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
+    verify_access_token(token)
     # Находим набор по id
     db_set = db.query(Set).filter(Set.id == set_id).first()
     if not db_set:
@@ -254,7 +263,8 @@ async def delete_set(set_id: int, db: Session = Depends(get_db)):
 
 # Создание ведущего
 @app.post("/admin/createHost")
-def create_host(host: UserCreate, db: Session = Depends(get_db)):
+async def create_host(host: UserCreate, db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
+    verify_access_token(token)
     new_host = Host(login=host.login, password=host.password)
     db.add(new_host)
     db.commit()
@@ -264,7 +274,8 @@ def create_host(host: UserCreate, db: Session = Depends(get_db)):
 
 # Получение информации о карте
 @app.post("/admin/getCardInfo")
-def get_card_info(card_id: int, db: Session = Depends(get_db)):
+async def get_card_info(card_id: int, db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
+    verify_access_token(token)
     card_info = db.query(Card).filter(Card.id == card_id).first()
     if not card_info:
         raise HTTPException(status_code=404, detail="Card not found")
@@ -275,3 +286,22 @@ def get_card_info(card_id: int, db: Session = Depends(get_db)):
     }
 
     return card_data
+
+
+@app.post("/admin/editGame")
+async def edit_game(db: Session = Depends(get_db)):
+    pass
+
+
+@app.get("/admin-logout")
+async def admin_logout(token: str):
+    verify_access_token(token)
+    blacklist.add(token)
+    return {"message": "Admin logged out successfully"}
+
+
+@app.get("/host-logout")
+async def host_logout(token: str):
+    verify_access_token(token)
+    blacklist.add(token)
+    return {"message": "Host logged out successfully"}
