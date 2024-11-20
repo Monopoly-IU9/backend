@@ -35,6 +35,7 @@ class CardCreate(BaseModel):
     set_id: int  # ID набора, к которому относится карточка
 
 
+
 # Модель для создания игры
 class GameCreate(BaseModel):
     name: str

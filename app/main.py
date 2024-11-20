@@ -273,7 +273,7 @@ async def delete_card(card_id: int, db: Session = Depends(get_db), token: str = 
 
 
 # Удаление набора
-@app.post("/admin/deleteSet")
+@app.post("/admin/deleteSetByID")
 async def delete_set(set_id: int, db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
     verify_access_token(token)
     # Находим набор по id
@@ -290,7 +290,7 @@ async def delete_set(set_id: int, db: Session = Depends(get_db), token: str = De
     db.delete(db_set)
     db.commit()
 
-    return {"message": "Set and all associated cards deleted successfully!"}
+    return {"message": "Set deleted successfully!"}
 
 
 # Создание ведущего
@@ -393,3 +393,33 @@ async def login(form_data: UserLogin, db: Session = Depends(get_db)):
 
     access_token = create_access_token(data={"sub": adm.login})
     return {"access_token": access_token, "token_type": "bearer"}
+
+
+@app.get("/admin/getHosts")
+async def get_hosts(db: Session = Depends(get_db)):
+    hosts = db.query(Host).all()
+    return [{"id": host.id, "login": host.login, "password": host.password} for host in hosts]
+
+@app.post("/admin/editHost")
+async def edit_host(host_id: int, login: str, password: str, db: Session = Depends(get_db)):
+    db_host = db.query(Host).filter(Host.id == host_id).first()
+    if not db_host:
+        raise HTTPException(status_code=404, detail="Host not found")
+
+    db_host.login = login
+    db_host.password = password
+    db.commit()
+    db.refresh(db_host)
+
+    return {"message": "Host updated successfully!"}
+
+@app.post("/admin/deleteHostByID")
+async def delete_host_by_id(host_id: int, db: Session = Depends(get_db)):
+    db_host = db.query(Host).filter(Host.id == host_id).first()
+    if not db_host:
+        raise HTTPException(status_code=404, detail="Host not found")
+
+    db.delete(db_host)
+    db.commit()
+
+    return {"message": "Host deleted successfully!"}
