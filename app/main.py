@@ -1,11 +1,13 @@
+from typing import List
+
 from sqlalchemy.orm import Session
 from sqlalchemy import exc
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, Depends, HTTPException
-from app.models import Admin, Host, Category, Set, Card, Game, Base
+from app.models import Admin, Host, Category, Set, Card, Game, Base, set_card_association
 from app.database import SessionLocal, engine
-from app.schemas import UserLogin, CategoryCreate, CardCreate, GameCreate, UserCreate, SetCreate
+from app.schemas import UserLogin, CategoryCreate, CardCreate, GameCreate, UserCreate, SetCreate, CardInSet, HostCreate
 from app.utils import create_access_token, verify_access_token  # oauth2_scheme,
 from fastapi.security import OAuth2PasswordBearer
 
@@ -103,34 +105,34 @@ async def edit_category(category_id: int, category: CategoryCreate, db: Session 
     return {"message": "Category updated successfully!", "category_id": db_category.id}
 
 
-@app.post("/admin/editSet")
-async def edit_set(s: SetCreate, db: Session = Depends(get_db)):
-    db_set = db.query(Set).filter(Set.id == s.id).first()
+@app.post("/admin/editSetByID")
+async def edit_set_by_id(set_id: int, name: str, cards: List[int], db: Session = Depends(get_db),
+                         token: str = Depends(oauth2_scheme)):
+    verify_access_token(token)
+    db_set = db.query(Set).filter(Set.id == set_id).first()
     if not db_set:
         raise HTTPException(status_code=404, detail="Set not found")
 
-    db_set.name = s.name
-    db_set.cards = s.cards
-    db_set.category_id = s.category_id
+    db_set.name = name
+    db_set.cards = cards
     db.commit()
     db.refresh(db_set)
+
     return {"message": "Set updated successfully!", "set_id": db_set.id}
 
 
-@app.post("/admin/editCard")
-async def edit_card(card: CardCreate, db: Session = Depends(get_db)):
-    db_card = db.query(Card).filter(Card.id == card.id).first()
+@app.post("/admin/editCardByID")
+async def edit_card_by_id(card_id: int, description: str, tags: List[str], db: Session = Depends(get_db)):
+    db_card = db.query(Card).filter(Card.id == card_id).first()
     if not db_card:
         raise HTTPException(status_code=404, detail="Card not found")
-    db_card.number = card.number
-    db_card.description = card.description
-    db_card.hashtags = ",".join(card.hashtags)
-    db_card.set_id = card.set_id
 
+    db_card.description = description
+    db_card.hashtags = ",".join(tags)
     db.commit()
     db.refresh(db_card)
 
-    return {"message": "Card updated successfully!", "card_id": db_card.id}
+    return {"message": "Card updated successfully!"}
 
 
 # Создание игры
@@ -197,17 +199,12 @@ async def get_set_info(set_id: int, db: Session = Depends(get_db), token: str = 
     return set_data
 
 
-# Создание карточки
-@app.post("/admin/addCardToCategoryID")
-async def add_card_to_category(category_id: int, card_data: CardCreate, db: Session = Depends(get_db),
-                               token: str = Depends(oauth2_scheme)):
-    verify_access_token(token)
-    # Проверка существования категории
+@app.post("/admin/addCardByCategoryID")
+async def add_card_by_category_id(category_id: int, description: str, tags: List[str], db: Session = Depends(get_db)):
     category = db.query(Category).filter(Category.id == category_id).first()
     if not category:
         raise HTTPException(status_code=404, detail="Category not found")
 
-    # Создание нового набора (если не существует)
     main_set = db.query(Set).filter(Set.category_id == category_id).first()
     if not main_set:
         main_set = Set(name="Main Set", category_id=category_id)
@@ -215,11 +212,10 @@ async def add_card_to_category(category_id: int, card_data: CardCreate, db: Sess
         db.commit()
         db.refresh(main_set)
 
-    # Создание новой карточки
     new_card = Card(
-        number=card_data.number,
-        description=card_data.description,
-        hashtags=",".join(card_data.hashtags),
+        number=len(category.cards) + 1,
+        description=description,
+        hashtags=",".join(tags),
         set_id=main_set.id,
         category_id=category_id
     )
@@ -227,7 +223,7 @@ async def add_card_to_category(category_id: int, card_data: CardCreate, db: Sess
     db.commit()
     db.refresh(new_card)
 
-    return {"message": "Card added successfully!", "card_id": new_card.number}
+    return {"message": "Card added successfully!", "card_id": new_card.id}
 
 
 # Удаление категории
@@ -295,8 +291,7 @@ async def delete_set(set_id: int, db: Session = Depends(get_db), token: str = De
 
 # Создание ведущего
 @app.post("/admin/createHost")
-async def create_host(host: UserCreate, db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
-    verify_access_token(token)
+async def create_host(host: UserCreate, db: Session = Depends(get_db)):
     new_host = Host(login=host.login, password=host.password)
     db.add(new_host)
     db.commit()
@@ -400,18 +395,20 @@ async def get_hosts(db: Session = Depends(get_db)):
     hosts = db.query(Host).all()
     return [{"id": host.id, "login": host.login, "password": host.password} for host in hosts]
 
+
 @app.post("/admin/editHost")
-async def edit_host(host_id: int, login: str, password: str, db: Session = Depends(get_db)):
-    db_host = db.query(Host).filter(Host.id == host_id).first()
+async def edit_host(host: HostCreate, db: Session = Depends(get_db)):
+    db_host = db.query(Host).filter(Host.id == host.id).first()
     if not db_host:
         raise HTTPException(status_code=404, detail="Host not found")
 
-    db_host.login = login
-    db_host.password = password
+    db_host.login = host.login
+    db_host.password = host.password
     db.commit()
     db.refresh(db_host)
 
     return {"message": "Host updated successfully!"}
+
 
 @app.post("/admin/deleteHostByID")
 async def delete_host_by_id(host_id: int, db: Session = Depends(get_db)):
@@ -423,3 +420,35 @@ async def delete_host_by_id(host_id: int, db: Session = Depends(get_db)):
     db.commit()
 
     return {"message": "Host deleted successfully!"}
+
+
+@app.post("/admin/addSetByCategoryID")
+async def add_set_by_category_id(category_id: int, name: str, cards: List[int], db: Session = Depends(get_db)):
+    category = db.query(Category).filter(Category.id == category_id).first()
+    if not category:
+        raise HTTPException(status_code=404, detail="Category not found")
+
+    new_set = Set(name=name, category_id=category_id)
+    db.add(new_set)
+    db.commit()
+    db.refresh(new_set)
+
+    # Добавление карточек в набор через промежуточную таблицу
+    for card_id in cards:
+        card = db.query(Card).filter(Card.id == card_id).first()
+        if not card:
+            raise HTTPException(status_code=404, detail=f"Card with id {card_id} not found")
+
+        # Проверка, существует ли уже связь между набором и карточкой
+        existing_association = db.query(set_card_association).filter(
+            set_card_association.c.set_id == new_set.id,
+            set_card_association.c.card_id == card.id
+        ).first()
+
+        if not existing_association:
+            new_set.cards.append(card)
+
+    db.commit()
+    db.refresh(new_set)
+
+    return {"message": "Set added successfully!", "set_id": new_set.id}

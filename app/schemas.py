@@ -35,6 +35,11 @@ class CardCreate(BaseModel):
     set_id: int  # ID набора, к которому относится карточка
 
 
+class CardInSet(BaseModel):
+    id: int
+    description: str
+    hashtags: List[str]
+
 
 # Модель для создания игры
 class GameCreate(BaseModel):
@@ -127,3 +132,8 @@ class Admin(BaseModel):
 
     class Config:
         orm_mode = True
+
+class HostCreate(BaseModel):
+    id: int
+    login: str
+    password: str

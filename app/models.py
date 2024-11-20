@@ -9,8 +9,8 @@ Base = declarative_base()
 # Связь между Set и Card
 set_card_association = Table(
     "set_card_association", Base.metadata,
-    Column("set_id", Integer, ForeignKey("sets.id"), primary_key=True),
-    Column("card_id", Integer, ForeignKey("cards.id"), primary_key=True)
+    Column("set_id", Integer, ForeignKey("sets.id"), primary_key=True, unique=False),
+    Column("card_id", Integer, ForeignKey("cards.id"), primary_key=True, unique=False)
 )
 
 # Связь между Game и Category
