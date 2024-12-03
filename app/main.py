@@ -161,7 +161,7 @@ async def get_category_data(category_id: int, db: Session = Depends(get_db)):
         card_data.append({
             "id": card.id,
             "description": card.description,
-            "tags": card.hashtags
+            "tags": card.hashtags.split(',')
         })
 
     for set in sets:
@@ -201,13 +201,14 @@ async def addSetByCategoryID(set_data: SetCreate, db: Session = Depends(get_db))
 
 
 @app.post("/admin/editSetByID")
-async def edit_set_by_id(set: SetEdit, db: Session = Depends(get_db)):
-    db_set = db.query(Set).filter(Set.id == set.id).first()
+async def edit_set_by_id(set_id: int, set: SetEdit, db: Session = Depends(get_db)):
+    db_set = db.query(Set).filter(Set.id == set_id).first()
     if not db_set:
         raise HTTPException(status_code=404, detail="Set not found")
 
     db_set.name = set.name
-    db_set.cards = set.cards
+    db_set.cards = [db.query(Card).filter(Card.id == card_id).first() for card_id in
+                          set.cards]
     db.commit()
     db.refresh(db_set)
 
@@ -281,8 +282,8 @@ async def add_card_by_category_id(card: Card_add, db: Session = Depends(get_db))
 
 
 @app.post("/admin/editCardByID")
-async def edit_card_by_id(card: CardEdit, db: Session = Depends(get_db)):
-    db_card = db.query(Card).filter(Card.id == card.id).first()
+async def edit_card_by_id(card_id: int, card: CardEdit, db: Session = Depends(get_db)):
+    db_card = db.query(Card).filter(Card.id == card_id).first()
     if not db_card:
         raise HTTPException(status_code=404, detail="Card not found")
 
