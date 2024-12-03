@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel
 from typing import List, Optional
 
@@ -44,7 +46,8 @@ class CardInSet(BaseModel):
 # Модель для создания игры
 class GameCreate(BaseModel):
     name: str
-
+    sets: List[int]
+    categories: List[int]
 
 # Схема для отображения информации о категории
 class Category(BaseModel):
@@ -93,11 +96,9 @@ class Card(BaseModel):
 # Схема для отображения игры
 class Game(BaseModel):
     id: int
-    game_code: str
     status: str  # Статус игры (waiting, started, finished)
-    # Связь с ведущим
-    host_id: int
-    host_login: str  # Логин ведущего
+    start_time: Optional[datetime]  # Время начала игры
+
     # Связь многие-ко-многим с категориями
     categories: List[Category] = []  # Список категорий, связанных с игрой
     # Связь многие-ко-многим с наборами

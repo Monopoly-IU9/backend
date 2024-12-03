@@ -1,5 +1,8 @@
+from datetime import datetime, timedelta
 from typing import List
+import random
 
+from pymongo.synchronous.database import Database
 from sqlalchemy.orm import Session
 from sqlalchemy import exc
 from fastapi.responses import FileResponse
@@ -321,36 +324,6 @@ async def get_card_info(card_id: int, db: Session = Depends(get_db)):
     return {"card_data": card_data}
 
 
-# Функции для работы с играми
-@app.post("/admin/new-game")
-async def new_game(game_data: GameCreate, db: Session = Depends(get_db)):
-    # Создание нового игрового объекта
-    new_game = Game(
-        name=game_data.name
-    )
-
-    # Добавление игры в базу данных
-    db.add(new_game)
-
-    try:
-        db.commit()  # Сохранение изменений
-        db.refresh(new_game)  # Обновление объекта после коммита
-    except exc.IntegrityError:  # Обработка ошибок, если возникнут проблемы с уникальностью или другими ограничениями
-        db.rollback()  # Откатываем изменения, если возникла ошибка
-        raise HTTPException(status_code=400, detail="Error occurred while creating the game")
-
-    # Возвращаем информацию о созданной игре (код игры и ID хоста)
-    return {
-        "message": "Game created successfully!",
-        "name": new_game.name
-    }
-
-
-@app.post("/admin/editGame")
-async def edit_game(db: Session = Depends(get_db)):
-    pass
-
-
 # Функции для работы с ведущими
 @app.post("/admin/createHost")
 async def create_host(host: UserCreate, db: Session = Depends(get_db)):
@@ -422,9 +395,6 @@ async def check_auth():
     return {"message": "Host is authorized"}
 
 
-from fastapi import Form
-
-
 # Эндпоинт для получения токена
 @app.post("/token")
 async def login(form_data: UserLogin, db: Session = Depends(get_db)):
@@ -436,3 +406,121 @@ async def login(form_data: UserLogin, db: Session = Depends(get_db)):
 
     access_token = create_access_token(data={"sub": adm.login})
     return {"access_token": access_token, "token_type": "bearer"}
+
+
+# Функции для работы с играми
+@app.post("/admin/new-game")
+async def new_game(game_data: GameCreate, db: Session = Depends(get_db)):
+    new_game = Game(
+        name=game_data.name,
+        status="waiting",
+    )
+
+    # Добавление игры в базу данных
+    db.add(new_game)
+    try:
+        db.commit()  # Сохранение изменений
+        db.refresh(new_game)  # Обновление объекта после коммита
+    except exc.IntegrityError:  # Обработка ошибок, если возникнут проблемы с уникальностью или другими ограничениями
+        db.rollback()  # Откатываем изменения, если возникла ошибка
+        raise HTTPException(status_code=400, detail="Error occurred while creating the game")
+    for set_id in game_data.sets:
+        s = db.query(Set).filter(Set.id == set_id).first()
+        if not s:
+            raise HTTPException(status_code=404, detail=f"Set with id {set_id} not found")
+        new_game.sets.append(s)
+
+    for category_id in game_data.categories:
+        c = db.query(Category).filter(Category.id == category_id).first()
+        if not c:
+            raise HTTPException(status_code=404, detail=f"Category with id {category_id} not found")
+        new_game.categories.append(c)
+
+    db.commit()
+    db.refresh(new_game)
+
+    # Возвращаем информацию о созданной игре
+    return {
+        "message": "Game created successfully!",
+        "id": new_game.id
+    }
+
+
+@app.post("/admin/start-game/{game_id}")
+async def start_game(game_id: int, db: Session = Depends(get_db)):
+    '''game = db.query(Game).filter(Game.id == game_id).first()
+    if not game:
+        raise HTTPException(status_code=404, detail="Game not found")
+
+    if game.status != "waiting":
+        raise HTTPException(status_code=400, detail="Game is already started or finished")
+
+    deck = []
+    sets = game.sets
+    for set_ in sets:
+        set_card_associations = db.query(SetCardAssociation).filter(SetCardAssociation.set_id == set_.id).all()
+        for association in set_card_associations:
+            deck.append(str(association.card_id))
+
+    game.initial_deck = ','.join(deck)
+    random.shuffle(deck)
+    game.deck =
+
+    game.status = "started"
+    game.start_time = datetime.utcnow()
+    db.commit()
+    db.refresh(game)
+
+    return {"message": "Game started successfully!", "game_id": game.id}'''
+
+
+@app.post("/admin/finish-game/{game_id}")
+async def finish_game(game_id: int, db: Session = Depends(get_db)):
+    game = db.query(Game).filter(Game.id == game_id).first()
+    if not game:
+        raise HTTPException(status_code=404, detail="Game not found")
+
+    if game.status != "started":
+        raise HTTPException(status_code=400, detail="Game is not started")
+
+    game.status = "waiting"
+    db.commit()
+    db.refresh(game)
+
+    return {"message": "Game finished successfully!", "game_id": game.id}
+
+
+@app.get("/admin/check-game-status/{game_id}")
+async def check_game_status(game_id: int, db: Session = Depends(get_db)):
+    game = db.query(Game).filter(Game.id == game_id).first()
+    if not game:
+        raise HTTPException(status_code=404, detail="Game not found")
+
+    if game.status == "started" and game.start_time:
+        elapsed_time = datetime.utcnow() - game.start_time
+        if elapsed_time > timedelta(hours=12):
+            game.status = "waiting"
+            db.commit()
+            db.refresh(game)
+
+    return {"game_id": game.id, "status": game.status}
+
+
+@app.post("/getCategoriesByGameID")
+async def get_categories_by_game_id(game_id: int, db: Session = Depends(get_db)):
+    game = db.query(Game).filter(Game.id == game_id).first()
+    if not game:
+        raise HTTPException(status_code=404, detail="Game not found")
+
+    # Получаем все категории, связанные с игрой
+    categories = game.categories
+
+    category_data = []
+    for category in categories:
+        category_data.append({
+            "id": category.id,
+            "name": category.name,
+            "color": category.color
+        })
+
+    return {"game_id": game.id, "categories": category_data}

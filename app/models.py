@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
 
@@ -77,7 +77,6 @@ class Card(Base):
     description = Column(String)
     hashtags = Column(String)
 
-
     # Связь многие-ко-одному с категорией
     category_id = Column(Integer, ForeignKey("categories.id"))
     category = relationship("Category", back_populates="cards")
@@ -90,11 +89,9 @@ class Card(Base):
 class Game(Base):
     __tablename__ = "games"
     id = Column(Integer, primary_key=True, index=True)
-    game_code = Column(String, unique=True, index=True)
+    name = Column(String, unique=True)
     status = Column(String, default="waiting")  # Статус игры (waiting, started, finished)
-
-    host_id = Column(Integer, ForeignKey("hosts.id"))
-    host = relationship("Host")
+    start_time = Column(DateTime, nullable=True)
 
     # Связь многие-ко-многим с категориями
     categories = relationship("Category", secondary=GameCategoryAssociation.__table__, back_populates="games")
