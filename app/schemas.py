@@ -49,6 +49,7 @@ class GameCreate(BaseModel):
     sets: List[int]
     categories: List[int]
 
+
 # Схема для отображения информации о категории
 class Category(BaseModel):
     id: int
@@ -147,12 +148,16 @@ class SetCreate(BaseModel):
 
 
 class SetEdit(BaseModel):
-    id: int
     name: str
     cards: List[int] = []
 
 
 class CardEdit(BaseModel):
-    id: int
     description: str
     hashtags: List[str]
+
+
+class GameEdit(BaseModel):
+    name: str
+    sets: List[int]
+    categories: List[int]

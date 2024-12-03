@@ -12,7 +12,7 @@ from app.models import Admin, Host, Category, Set, Card, Game, Base, GameCategor
     GameSetAssociation
 from app.database import SessionLocal, engine
 from app.schemas import UserLogin, CategoryCreate, CardCreate, GameCreate, UserCreate, SetCreate, CardInSet, HostCreate, \
-    Card_add, SetEdit, CardEdit
+    Card_add, SetEdit, CardEdit, GameEdit
 from app.utils import create_access_token, verify_access_token  # oauth2_scheme,
 from fastapi.security import OAuth2PasswordBearer
 
@@ -524,3 +524,45 @@ async def get_categories_by_game_id(game_id: int, db: Session = Depends(get_db))
         })
 
     return {"game_id": game.id, "categories": category_data}
+
+
+@app.post("/admin/editGame")
+async def edit_game(game_id: int, game: GameEdit, db: Session = Depends(get_db)):
+    # Поиск игры по ID
+    db_game = db.query(Game).filter(Game.id == game_id).first()
+
+    # Проверка, существует ли игра
+    if not db_game:
+        raise HTTPException(status_code=404, detail="Game not found")
+
+    # Проверка на уникальность названия
+    existing_game = db.query(Game).filter(Game.name == game.name).first()
+    if existing_game and existing_game.id != game_id:
+        raise HTTPException(status_code=400, detail="Game name must be unique")
+
+    db_game.name = game.name
+    db_game.categories = [db.query(Category).filter(Category.id == category_id).first() for category_id in
+                          game.categories]
+
+    db_game.sets = [db.query(Set).filter(Set.id == set_id).first() for set_id in game.sets]
+    # Применение изменений
+    db.commit()
+    db.refresh(db_game)
+
+    return {"message": "Game updated successfully!", "game_id": db_game.id}
+
+
+@app.post("/admin/deleteGame/{game_id}")
+async def delete_game(game_id: int, db: Session = Depends(get_db)):
+    # Поиск игры по ID
+    db_game = db.query(Game).filter(Game.id == game_id).first()
+
+    # Проверка, существует ли игра
+    if not db_game:
+        raise HTTPException(status_code=404, detail="Game not found")
+
+    # Удаление игры и всех связанных записей
+    db.delete(db_game)
+    db.commit()
+
+    return {"message": "Game deleted successfully!", "game_id": game_id}
