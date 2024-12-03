@@ -62,13 +62,6 @@ class Category(BaseModel):
         orm_mode = True
 
 
-class SetCreate(BaseModel):
-    id: int
-    name: str
-    category_id: int
-    cards: List[int] = []
-
-
 # Схема для отображения набора
 class Set(BaseModel):
     id: int
@@ -133,7 +126,32 @@ class Admin(BaseModel):
     class Config:
         orm_mode = True
 
+
 class HostCreate(BaseModel):
     id: int
     login: str
     password: str
+
+
+class Card_add(BaseModel):
+    category_id: int
+    description: str
+    hashtags: List[str]
+
+
+class SetCreate(BaseModel):
+    name: str
+    category_id: int
+    cards: List[int] = []
+
+
+class SetEdit(BaseModel):
+    id: int
+    name: str
+    cards: List[int] = []
+
+
+class CardEdit(BaseModel):
+    id: int
+    description: str
+    hashtags: List[str]

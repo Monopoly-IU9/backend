@@ -1,31 +1,28 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Table
+from sqlalchemy import Column, Integer, String, ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
 
-# Вспомогательные таблицы для связи многие-ко-многим
 
-# Связь между Set и Card
-set_card_association = Table(
-    "set_card_association", Base.metadata,
-    Column("set_id", Integer, ForeignKey("sets.id"), primary_key=True, unique=False),
-    Column("card_id", Integer, ForeignKey("cards.id"), primary_key=True, unique=False)
-)
+# Промежуточные модели для связи многие-ко-многим
 
-# Связь между Game и Category
-game_category_association = Table(
-    "game_category_association", Base.metadata,
-    Column("game_id", Integer, ForeignKey("games.id"), primary_key=True),
-    Column("category_id", Integer, ForeignKey("categories.id"), primary_key=True)
-)
+class SetCardAssociation(Base):
+    __tablename__ = "set_card_association"
+    set_id = Column(Integer, ForeignKey("sets.id"), primary_key=True)
+    card_id = Column(Integer, ForeignKey("cards.id"), primary_key=True)
 
-# Связь между Game и Set
-game_set_association = Table(
-    "game_set_association", Base.metadata,
-    Column("game_id", Integer, ForeignKey("games.id"), primary_key=True),
-    Column("set_id", Integer, ForeignKey("sets.id"), primary_key=True)
-)
+
+class GameCategoryAssociation(Base):
+    __tablename__ = "game_category_association"
+    game_id = Column(Integer, ForeignKey("games.id"), primary_key=True)
+    category_id = Column(Integer, ForeignKey("categories.id"), primary_key=True)
+
+
+class GameSetAssociation(Base):
+    __tablename__ = "game_set_association"
+    game_id = Column(Integer, ForeignKey("games.id"), primary_key=True)
+    set_id = Column(Integer, ForeignKey("sets.id"), primary_key=True)
 
 
 # Модель для админов
@@ -53,7 +50,7 @@ class Category(Base):
 
     sets = relationship("Set", back_populates="category")
     # Связь многие-ко-многим с играми
-    games = relationship("Game", secondary=game_category_association, back_populates="categories")
+    games = relationship("Game", secondary=GameCategoryAssociation.__table__, back_populates="categories")
     # Связь один-ко-многим с карточками
     cards = relationship("Card", back_populates="category")
 
@@ -67,9 +64,9 @@ class Set(Base):
 
     category = relationship("Category", back_populates="sets")
     # Связь многие-ко-многим с карточками
-    cards = relationship("Card", secondary=set_card_association, back_populates="sets")
+    cards = relationship("Card", secondary=SetCardAssociation.__table__, back_populates="sets")
     # Связь многие-ко-многим с играми
-    games = relationship("Game", secondary=game_set_association, back_populates="sets")
+    games = relationship("Game", secondary=GameSetAssociation.__table__, back_populates="sets")
 
 
 # Модель для карточек
@@ -80,15 +77,13 @@ class Card(Base):
     description = Column(String)
     hashtags = Column(String)
 
-    set_id = Column(Integer, ForeignKey("sets.id"))
-    set = relationship("Set", back_populates="cards")
 
     # Связь многие-ко-одному с категорией
     category_id = Column(Integer, ForeignKey("categories.id"))
     category = relationship("Category", back_populates="cards")
 
     # Связь многие-ко-многим с наборами
-    sets = relationship("Set", secondary=set_card_association, back_populates="cards")
+    sets = relationship("Set", secondary=SetCardAssociation.__table__, back_populates="cards")
 
 
 # Модель для игр
@@ -102,7 +97,7 @@ class Game(Base):
     host = relationship("Host")
 
     # Связь многие-ко-многим с категориями
-    categories = relationship("Category", secondary=game_category_association, back_populates="games")
+    categories = relationship("Category", secondary=GameCategoryAssociation.__table__, back_populates="games")
 
     # Связь многие-ко-многим с наборами
-    sets = relationship("Set", secondary=game_set_association, back_populates="games")
+    sets = relationship("Set", secondary=GameSetAssociation.__table__, back_populates="games")
