@@ -374,18 +374,20 @@ async def admin_logout(token: str):
     return {"message": "Admin logged out successfully"}
 
 
-@app.get("/host/logout")
-async def host_logout(token: str):
-    blacklist.add(token)
-    return {"message": "Host logged out successfully"}
-
-
 @app.post("/admin/checkAuth")
-async def check_auth_admin():
-    username = "test"
+async def check_auth_admin(token: str = Depends(oauth2_scheme)):
+    username = verify_access_token(token)
     if username != "admin":
         raise HTTPException(status_code=403, detail="Admin privileges required")
     return {"message": "Admin is authorized"}
+
+
+@app.post("/host/checkAuth")
+async def check_auth(token: str = Depends(oauth2_scheme)):
+    username = verify_access_token(token)
+    if username != "host":
+        raise HTTPException(status_code=403, detail="Host privileges required")
+    return {"message": "Host is authorized"}
 
 
 @app.post("/host/checkAuth")
