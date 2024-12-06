@@ -2,7 +2,6 @@ from datetime import datetime, timedelta
 from typing import List
 import random
 
-from pymongo.synchronous.database import Database
 from sqlalchemy.orm import Session
 from sqlalchemy import exc
 from fastapi.responses import FileResponse
@@ -80,6 +79,11 @@ async def register_admin(host: UserLogin, db: Session = Depends(get_db)):
 # Функции для работы с категориями
 @app.post("/admin/createCategory")
 async def create_category(category: CategoryCreate, db: Session = Depends(get_db)):
+    # Проверка на уникальность названия
+    existing_category = db.query(Category).filter(Category.name == category.name).first()
+    if existing_category:
+        raise HTTPException(status_code=400, detail="Category name must be unique")
+
     new_category = Category(name=category.name, color=category.color)
     db.add(new_category)
     db.commit()
@@ -181,6 +185,11 @@ async def addSetByCategoryID(set_data: SetCreate, db: Session = Depends(get_db))
     if not category:
         raise HTTPException(status_code=404, detail="Category not found")
 
+    # Проверка на уникальность названия
+    existing_set = db.query(Set).filter(Set.name == set_data.name).first()
+    if existing_set:
+        raise HTTPException(status_code=400, detail="Set name must be unique")
+
     # Создание нового набора
     new_set = Set(name=set_data.name, category_id=set_data.category_id)
     db.add(new_set)
@@ -208,7 +217,7 @@ async def edit_set_by_id(set_id: int, set: SetEdit, db: Session = Depends(get_db
 
     db_set.name = set.name
     db_set.cards = [db.query(Card).filter(Card.id == card_id).first() for card_id in
-                          set.cards]
+                    set.cards]
     db.commit()
     db.refresh(db_set)
 
@@ -220,7 +229,12 @@ async def delete_set(set_id: int, db: Session = Depends(get_db)):
     db_set = db.query(Set).filter(Set.id == set_id).first()
     if not db_set:
         raise HTTPException(status_code=404, detail="Set not found")
+    if db_set.name.startswith("Main Set"):
+        raise HTTPException(status_code=400, detail="You cannot delete the main set")
 
+    set_card_associations = db.query(SetCardAssociation).filter(SetCardAssociation.set_id == set_id).all()
+    for association in set_card_associations:
+        db.delete(association)
     # Удаление всех карточек, связанных с набором
     for card in db_set.cards:
         db.delete(card)
@@ -388,15 +402,6 @@ async def check_auth(token: str = Depends(oauth2_scheme)):
     if username != "host":
         raise HTTPException(status_code=403, detail="Host privileges required")
     return {"message": "Host is authorized"}
-
-
-@app.post("/host/checkAuth")
-async def check_auth():
-    username = "test"
-    if username != "host":
-        raise HTTPException(status_code=403, detail="Host privileges required")
-    return {"message": "Host is authorized"}
-
 
 # Эндпоинт для получения токена
 @app.post("/token")
