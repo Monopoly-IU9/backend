@@ -3,8 +3,6 @@ from typing import List
 import random
 
 from sqlalchemy.orm import Session
-from sqlalchemy import exc
-from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, Depends, HTTPException
 from app.models import Admin, Host, Category, Set, Card, Game, Base, GameCategoryAssociation, SetCardAssociation, \
@@ -76,7 +74,7 @@ async def register_admin(host: UserLogin, db: Session = Depends(get_db)):
     return {"access_token": access_token, "token_type": "bearer"}
 
 
-# Функции для работы с категориями
+# Создание категории
 @app.post("/admin/createCategory")
 async def create_category(category: CategoryCreate, db: Session = Depends(get_db)):
     # Проверка на уникальность названия
@@ -84,6 +82,7 @@ async def create_category(category: CategoryCreate, db: Session = Depends(get_db
     if existing_category:
         raise HTTPException(status_code=400, detail="Category name must be unique")
 
+    # Создание
     new_category = Category(name=category.name, color=category.color)
     db.add(new_category)
     db.commit()
@@ -98,6 +97,7 @@ async def create_category(category: CategoryCreate, db: Session = Depends(get_db
     return {"message": "Category created successfully!", "category_id": new_category.id}
 
 
+# Редактирование категории
 @app.post("/admin/editCategory")
 async def edit_category(category_id: int, category: CategoryCreate, db: Session = Depends(get_db)):
     # Поиск категории по ID
@@ -123,12 +123,15 @@ async def edit_category(category_id: int, category: CategoryCreate, db: Session 
     return {"message": "Category updated successfully!", "category_id": db_category.id}
 
 
+# Данные о всех категориях
 @app.get("/admin/getCategories")
 async def get_categories(db: Session = Depends(get_db)):
+    # Получение всех категорий
     categories = db.query(Category).all()
     return [{"id": category.id, "name": category.name, "color": category.color} for category in categories]
 
 
+#
 @app.post("/admin/deleteCategory")
 async def delete_category(category_id: int, db: Session = Depends(get_db)):
     # Получаем категорию по id
@@ -405,6 +408,7 @@ async def check_auth(token: str = Depends(oauth2_scheme)):
         raise HTTPException(status_code=403, detail="Host privileges required")
     return {"message": "Host is authorized"}
 
+
 # Эндпоинт для получения токена
 @app.post("/token")
 async def login(form_data: UserLogin, db: Session = Depends(get_db)):
@@ -423,17 +427,18 @@ async def login(form_data: UserLogin, db: Session = Depends(get_db)):
 async def new_game(game_data: GameCreate, db: Session = Depends(get_db)):
     new_game = Game(
         name=game_data.name,
+        start_time=None,
         status="waiting",
+        initial_deck=None,
+        deck=None
     )
-
+    existing_game = db.query(Game).filter(Game.name == game_data.name).first()
+    if existing_game:
+        raise HTTPException(status_code=400, detail="Game name must be unique")
     # Добавление игры в базу данных
     db.add(new_game)
-    try:
-        db.commit()  # Сохранение изменений
-        db.refresh(new_game)  # Обновление объекта после коммита
-    except exc.IntegrityError:  # Обработка ошибок, если возникнут проблемы с уникальностью или другими ограничениями
-        db.rollback()  # Откатываем изменения, если возникла ошибка
-        raise HTTPException(status_code=400, detail="Error occurred while creating the game")
+    db.commit()
+    db.refresh(new_game)
     for set_id in game_data.sets:
         s = db.query(Set).filter(Set.id == set_id).first()
         if not s:
@@ -458,30 +463,80 @@ async def new_game(game_data: GameCreate, db: Session = Depends(get_db)):
 
 @app.post("/admin/start-game/{game_id}")
 async def start_game(game_id: int, db: Session = Depends(get_db)):
-    '''game = db.query(Game).filter(Game.id == game_id).first()
+    game = db.query(Game).filter(Game.id == game_id).first()
     if not game:
         raise HTTPException(status_code=404, detail="Game not found")
 
     if game.status != "waiting":
-        raise HTTPException(status_code=400, detail="Game is already started or finished")
+        raise HTTPException(status_code=400, detail="Game is already started")
 
     deck = []
     sets = game.sets
     for set_ in sets:
         set_card_associations = db.query(SetCardAssociation).filter(SetCardAssociation.set_id == set_.id).all()
         for association in set_card_associations:
-            deck.append(str(association.card_id))
+            card_id = association.card_id
+            card = db.query(Card).filter(Card.id == card_id).first()
+            deck.append(f'{str(card_id)}.{card.category_id}')
+
+    random.shuffle(deck)
 
     game.initial_deck = ','.join(deck)
-    random.shuffle(deck)
-    game.deck =
-
+    game.deck = ','.join(deck)
     game.status = "started"
     game.start_time = datetime.utcnow()
     db.commit()
     db.refresh(game)
 
-    return {"message": "Game started successfully!", "game_id": game.id}'''
+    return {"message": "Game started successfully!", "game_id": game.id}
+
+
+@app.post("/game/draw-card/{game_id}")
+async def draw_card(game_id: int, category_id: int, db: Session = Depends(get_db)):
+    game = db.query(Game).filter(Game.id == game_id).first()
+    category = db.query(Category).filter(Category.id == category_id).first()
+    if not game:
+        raise HTTPException(status_code=404, detail="Game not found")
+
+    if game.status != "started":
+        raise HTTPException(status_code=400, detail="Game is not started")
+    deck = game.deck.split(',')
+    found = False
+    # Поиск карты из нужной категории
+    for d in deck:
+        card_id, categ_id = d.split('.')
+        if int(categ_id) == category_id:
+            found = True
+            break
+    # Заполнение недостающими картами из категории
+    if not found:
+        init_deck = game.initial_deck.split(',')
+        for i in init_deck:
+            card_id, categ_id = i.split('.')
+            if int(categ_id) == category_id:
+                deck.append(f'{card_id}.{categ_id}')
+    random.shuffle(deck)
+    c_id = 0
+    k = 0
+    # Получение id карточки
+    for d in deck:
+        k += 1
+        card_id, categ_id = d.split('.')
+        if int(categ_id) == category_id:
+            c_id = card_id
+            deck.pop(k - 1)
+            break
+    game.deck = ','.join(deck)
+    card = db.query(Card).filter(Card.id == c_id).first()
+    card_data = {
+        "number": f'{category_id}.{card.number}',
+        "description": card.description,
+        "color": category.color,
+        "name": category.name
+    }
+    db.commit()
+    db.refresh(game)
+    return card_data
 
 
 @app.post("/admin/finish-game/{game_id}")
@@ -492,8 +547,10 @@ async def finish_game(game_id: int, db: Session = Depends(get_db)):
 
     if game.status != "started":
         raise HTTPException(status_code=400, detail="Game is not started")
-
+    game.deck = None
+    game.initial_deck = None
     game.status = "waiting"
+    game.start_time = None
     db.commit()
     db.refresh(game)
 

@@ -92,6 +92,8 @@ class Game(Base):
     name = Column(String, unique=True)
     status = Column(String, default="waiting")  # Статус игры (waiting, started, finished)
     start_time = Column(DateTime, nullable=True)
+    initial_deck = Column(String, nullable=True)
+    deck = Column(String, nullable=True)
 
     # Связь многие-ко-многим с категориями
     categories = relationship("Category", secondary=GameCategoryAssociation.__table__, back_populates="games")
