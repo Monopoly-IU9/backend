@@ -143,9 +143,11 @@ async def delete_category(category_id: int, db: Session = Depends(get_db)):
         set_card_associations = db.query(SetCardAssociation).filter(SetCardAssociation.set_id == set_.id).all()
         for association in set_card_associations:
             db.delete(association)
-
         # Удаляем набор
         db.delete(set_)
+    cards = db.query(Card).filter(Card.category_id == category_id).all()
+    for card in cards:
+        db.delete(card)
 
     # Удаляем категорию
     db.delete(category)
