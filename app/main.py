@@ -472,12 +472,15 @@ async def start_game(game_id: int, db: Session = Depends(get_db)):
 
     deck = []
     sets = game.sets
+    all_cards = set()
     for set_ in sets:
         set_card_associations = db.query(SetCardAssociation).filter(SetCardAssociation.set_id == set_.id).all()
         for association in set_card_associations:
-            card_id = association.card_id
-            card = db.query(Card).filter(Card.id == card_id).first()
-            deck.append(f'{str(card_id)}.{card.category_id}')
+            all_cards.add(association.card_id)
+    all_cards = list(all_cards)
+    for a_c_id in all_cards:
+        card = db.query(Card).filter(Card.id == a_c_id).first()
+        deck.append(f'{str(a_c_id)}.{card.category_id}')
 
     random.shuffle(deck)
 
@@ -605,65 +608,90 @@ async def get_categories_by_game_id(game_id: int, db: Session = Depends(get_db))
     return {"game_id": game.id, "categories": category_data}
 
 
-@app.post("/admin/getgameInfo/{game_id}")
+@app.get("/admin/getgameInfo/{game_id}")
 async def get_game_info(game_id: int, db: Session = Depends(get_db)):
     # название игры, список категорий с флагами, список сетов с флагами, хештеги с флагами
     game = db.query(Game).filter(Game.id == game_id).first()
+    # Получение всех категорий в игре
     categories_in_game = db.query(GameCategoryAssociation).filter(GameCategoryAssociation.game_id == game_id).all()
-    id_list = [categ.category_id for categ in categories_in_game]
+    # Получение всех наборов в игре
+    sets_in_game = db.query(GameSetAssociation).filter(GameSetAssociation.game_id == game_id).all()
+    # Список id наборов в игре
+    id_set_list = [s.set_id for s in sets_in_game]
+    # Список id категорий  в игре
+    id_category_list = [categ.category_id for categ in categories_in_game]
+    # Получение всех категорий (которые вообще существуют)
     all_categories = db.query(Category).all()
+    # Получение всех сетов (которые вообще существуют)
     all_sets = db.query(Set).all()
-    game_data = []
+    id_all_sets = [s.id for s in all_sets]
+    game_data = dict()
+    game_data["name"] = game.name
+    category_data = []
     for c in all_categories:
         sets_in_category = db.query(Set).filter(Set.category_id == c.id).all()
-        sets_id_in_category = [set_iter.id for set_iter in sets_in_category]
-        print('TEST:', sets_id_in_category)
         sets_dict = []
-        for s in all_sets:
+        for s in sets_in_category:
             sets_dict.append({
                 "id": s.id,
                 "name": s.name,
-                "picked": s.id in sets_id_in_category
+                "in_category": s.id in id_set_list
             })
+        category_data.append({
+            "id": c.id,
+            "name": c.name,
+            "in_game": c.id in id_category_list,
+            "sets": sets_dict
+        })
+        print("CATEGORY", category_data)
+    game_data["categories"] = category_data
+    list_of_all_hashtags = set()
+    list_of_hashtags_in_game = set()
+    hash_list = []
+    for id_s in id_all_sets:
+        cards = db.query(SetCardAssociation).filter(SetCardAssociation.set_id == id_s).all()
+        for i in cards:
+            card = db.query(Card).filter(Card.id == i.card_id).first()
+            for h in card.hashtags.split(','):
+                list_of_all_hashtags.add(h)
+    for id_s in id_set_list:
+        cards = db.query(SetCardAssociation).filter(SetCardAssociation.set_id == id_s).all()
+        for i in cards:
+            card = db.query(Card).filter(Card.id == i.card_id).first()
+            for h in card.hashtags.split(','):
+                list_of_hashtags_in_game.add(h)
 
-        print(sets_dict)
-        if c.id in id_list:
-            game_data.append({
-                "id": c.id,
-                "name": c.name,
-                "picked": True,
-            })
-        else:
-            game_data.append({
-            })
-    return {}
-
-@app.post("/admin/editGame")
-async def edit_game(game_id: int, db: Session = Depends(get_db)):
-    game = db.query(Game).filter(Game.id == game_id).first()
-    categories_in_game = db.query(GameCategoryAssociation).filter(GameCategoryAssociation.game_id == game_id).all()
-    id_list = [categ.id for categ in categories_in_game]
-    all_categories = db.query(Category).all()
-    game_data = []
-    for c in all_categories:
-        cat_id = c.id
-
-        if cat_id in id_list:
-            game_data.append({
-                "id": c.id,
-                "name": c.name,
-                "picked": True,
-
-            })
-        else:
-            game_data.append({
-
-            })
-    return {}
+    for h in list_of_all_hashtags:
+        hash_list.append({
+            "name": h,
+            "in_game": h in list_of_hashtags_in_game
+        })
+    game_data["hashtags"] = hash_list
+    return game_data
 
 
+@app.post("/admin/editGame/{game_id}")
+async def edit_game(game_id: int, game: GameEdit, db: Session = Depends(get_db)):
+    # Поиск игры по ID
+    db_game = db.query(Game).filter(Game.id == game_id).first()
+    # Проверка, существует ли игра
+    if not db_game:
+        raise HTTPException(status_code=404, detail="Game not found")
+    # Проверка на уникальность названия
+    existing_game = db.query(Game).filter(Game.name == game.name).first()
+    if existing_game and existing_game.id != game_id:
+        raise HTTPException(status_code=400, detail="Game name must be unique")
+    db_game.name = game.name
+    db_game.categories = [db.query(Category).filter(Category.id == category_id).first() for category_id in
+                          game.categories]
+    db_game.sets = [db.query(Set).filter(Set.id == set_id).first() for set_id in game.sets]
+    # Применение изменений
+    db.commit()
+    db.refresh(db_game)
+    return {"message": "Game updated successfully!", "game_id": db_game.id}
 
-@app.post("/admin/deleteGame/{game_id}")
+
+@app.post("/admin/deleteGameByID")
 async def delete_game(game_id: int, db: Session = Depends(get_db)):
     # Поиск игры по ID
     db_game = db.query(Game).filter(Game.id == game_id).first()
