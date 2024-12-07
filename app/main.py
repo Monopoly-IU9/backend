@@ -569,11 +569,23 @@ async def check_game_status(game_id: int, db: Session = Depends(get_db)):
             game.status = "waiting"
             db.commit()
             db.refresh(game)
-
     return {"game_id": game.id, "status": game.status}
 
 
-@app.post("/getCategoriesByGameID")
+@app.get("/admin/getGames")
+async def admin_get_games(db: Session = Depends(get_db)):
+    games = db.query(Game).all()
+    return [{"id": game.id, "name": game.name} for game in games]
+
+
+@app.get("/host/getGames")
+async def host_get_games(db: Session = Depends(get_db)):
+    games = db.query(Game).all()
+    return [{"id": game.id, "name": game.name, "status": game.status} for game in games]
+
+
+@app.post("/host/getCategoriesByGameID")
+@app.post("/admin/getCategoriesByGameID")
 async def get_categories_by_game_id(game_id: int, db: Session = Depends(get_db)):
     game = db.query(Game).filter(Game.id == game_id).first()
     if not game:
@@ -593,30 +605,19 @@ async def get_categories_by_game_id(game_id: int, db: Session = Depends(get_db))
     return {"game_id": game.id, "categories": category_data}
 
 
+
+
 @app.post("/admin/editGame")
-async def edit_game(game_id: int, game: GameEdit, db: Session = Depends(get_db)):
-    # Поиск игры по ID
-    db_game = db.query(Game).filter(Game.id == game_id).first()
+async def edit_game(game_id: int, db: Session = Depends(get_db)):
+    game = db.query(Game).filter(Game.id == game_id).first()
+    categories_in_game = db.query(GameCategoryAssociation).filter(GameCategoryAssociation.game_id == game_id).all()
+    all_categories = db.query(Category).all()
+    game_data = {}
+    for categ in all_categories:
+        cat_id = categ.id
 
-    # Проверка, существует ли игра
-    if not db_game:
-        raise HTTPException(status_code=404, detail="Game not found")
+    return {}
 
-    # Проверка на уникальность названия
-    existing_game = db.query(Game).filter(Game.name == game.name).first()
-    if existing_game and existing_game.id != game_id:
-        raise HTTPException(status_code=400, detail="Game name must be unique")
-
-    db_game.name = game.name
-    db_game.categories = [db.query(Category).filter(Category.id == category_id).first() for category_id in
-                          game.categories]
-
-    db_game.sets = [db.query(Set).filter(Set.id == set_id).first() for set_id in game.sets]
-    # Применение изменений
-    db.commit()
-    db.refresh(db_game)
-
-    return {"message": "Game updated successfully!", "game_id": db_game.id}
 
 
 @app.post("/admin/deleteGame/{game_id}")
