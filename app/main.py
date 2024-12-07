@@ -430,7 +430,8 @@ async def new_game(game_data: GameCreate, db: Session = Depends(get_db)):
         start_time=None,
         status="waiting",
         initial_deck=None,
-        deck=None
+        deck=None,
+        hashtags=",".join(game_data.hashtags)
     )
     existing_game = db.query(Game).filter(Game.name == game_data.name).first()
     if existing_game:
@@ -469,14 +470,20 @@ async def start_game(game_id: int, db: Session = Depends(get_db)):
 
     if game.status != "waiting":
         raise HTTPException(status_code=400, detail="Game is already started")
-
+    hashtags_game = game.hashtags.split(",")
     deck = []
     sets = game.sets
     all_cards = set()
     for set_ in sets:
         set_card_associations = db.query(SetCardAssociation).filter(SetCardAssociation.set_id == set_.id).all()
         for association in set_card_associations:
-            all_cards.add(association.card_id)
+            card = db.query(Card).filter(association.card_id == Card.id).first()
+            hashtags_card = card.hashtags.split(",")
+            # Проверка на принадлежность хештегов карты в хештегах игры
+            for h in hashtags_card:
+                if h in hashtags_game:
+                    all_cards.add(card.id)
+                    break
     all_cards = list(all_cards)
     for a_c_id in all_cards:
         card = db.query(Card).filter(Card.id == a_c_id).first()
@@ -685,6 +692,7 @@ async def edit_game(game_id: int, game: GameEdit, db: Session = Depends(get_db))
     db_game.categories = [db.query(Category).filter(Category.id == category_id).first() for category_id in
                           game.categories]
     db_game.sets = [db.query(Set).filter(Set.id == set_id).first() for set_id in game.sets]
+    db_game.hashtags = ",".join(game.hashtags)
     # Применение изменений
     db.commit()
     db.refresh(db_game)

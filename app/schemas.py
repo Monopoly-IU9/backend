@@ -48,6 +48,7 @@ class GameCreate(BaseModel):
     name: str
     sets: List[int]
     categories: List[int]
+    hashtags: List[str]
 
 
 # Схема для отображения информации о категории
@@ -161,3 +162,4 @@ class GameEdit(BaseModel):
     name: str
     sets: List[int]
     categories: List[int]
+    hashtags: List[str]

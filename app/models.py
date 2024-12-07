@@ -94,6 +94,7 @@ class Game(Base):
     start_time = Column(DateTime, nullable=True)
     initial_deck = Column(String, nullable=True)
     deck = Column(String, nullable=True)
+    hashtags = Column(String, nullable=True)
 
     # Связь многие-ко-многим с категориями
     categories = relationship("Category", secondary=GameCategoryAssociation.__table__, back_populates="games")
