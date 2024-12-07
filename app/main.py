@@ -605,17 +605,60 @@ async def get_categories_by_game_id(game_id: int, db: Session = Depends(get_db))
     return {"game_id": game.id, "categories": category_data}
 
 
+@app.post("/admin/getgameInfo/{game_id}")
+async def get_game_info(game_id: int, db: Session = Depends(get_db)):
+    # название игры, список категорий с флагами, список сетов с флагами, хештеги с флагами
+    game = db.query(Game).filter(Game.id == game_id).first()
+    categories_in_game = db.query(GameCategoryAssociation).filter(GameCategoryAssociation.game_id == game_id).all()
+    id_list = [categ.category_id for categ in categories_in_game]
+    all_categories = db.query(Category).all()
+    all_sets = db.query(Set).all()
+    game_data = []
+    for c in all_categories:
+        sets_in_category = db.query(Set).filter(Set.category_id == c.id).all()
+        sets_id_in_category = [set_iter.id for set_iter in sets_in_category]
+        print('TEST:', sets_id_in_category)
+        sets_dict = []
+        for s in all_sets:
+            sets_dict.append({
+                "id": s.id,
+                "name": s.name,
+                "picked": s.id in sets_id_in_category
+            })
 
+        print(sets_dict)
+        if c.id in id_list:
+            game_data.append({
+                "id": c.id,
+                "name": c.name,
+                "picked": True,
+            })
+        else:
+            game_data.append({
+            })
+    return {}
 
 @app.post("/admin/editGame")
 async def edit_game(game_id: int, db: Session = Depends(get_db)):
     game = db.query(Game).filter(Game.id == game_id).first()
     categories_in_game = db.query(GameCategoryAssociation).filter(GameCategoryAssociation.game_id == game_id).all()
+    id_list = [categ.id for categ in categories_in_game]
     all_categories = db.query(Category).all()
-    game_data = {}
-    for categ in all_categories:
-        cat_id = categ.id
+    game_data = []
+    for c in all_categories:
+        cat_id = c.id
 
+        if cat_id in id_list:
+            game_data.append({
+                "id": c.id,
+                "name": c.name,
+                "picked": True,
+
+            })
+        else:
+            game_data.append({
+
+            })
     return {}
 
 
