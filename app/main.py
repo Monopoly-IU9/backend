@@ -512,6 +512,8 @@ async def draw_card(game_id: int, category_id: int, db: Session = Depends(get_db
         raise HTTPException(status_code=400, detail="Game is not started")
     deck = game.deck.split(',')
     found = False
+    if deck[0] == '' and len(deck) == 1:
+        deck = []
     # Поиск карты из нужной категории
     for d in deck:
         card_id, categ_id = d.split('.')
@@ -650,7 +652,6 @@ async def get_game_info(game_id: int, db: Session = Depends(get_db)):
             "in_game": c.id in id_category_list,
             "sets": sets_dict
         })
-        print("CATEGORY", category_data)
     game_data["categories"] = category_data
     list_of_all_hashtags = set()
     list_of_hashtags_in_game = set()
