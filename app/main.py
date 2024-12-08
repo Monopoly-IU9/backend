@@ -462,7 +462,7 @@ async def new_game(game_data: GameCreate, db: Session = Depends(get_db)):
     }
 
 
-@app.post("/admin/start-game/{game_id}")
+@app.post("/host/start-game/{game_id}")
 async def start_game(game_id: int, db: Session = Depends(get_db)):
     game = db.query(Game).filter(Game.id == game_id).first()
     if not game:
@@ -549,7 +549,7 @@ async def draw_card(game_id: int, category_id: int, db: Session = Depends(get_db
     return card_data
 
 
-@app.post("/admin/finish-game/{game_id}")
+@app.post("/host/finish-game/{game_id}")
 async def finish_game(game_id: int, db: Session = Depends(get_db)):
     game = db.query(Game).filter(Game.id == game_id).first()
     if not game:
