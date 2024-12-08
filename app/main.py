@@ -654,7 +654,6 @@ async def get_game_info(game_id: int, db: Session = Depends(get_db)):
         })
     game_data["categories"] = category_data
     list_of_all_hashtags = set()
-    list_of_hashtags_in_game = set()
     hash_list = []
     for id_s in id_all_sets:
         cards = db.query(SetCardAssociation).filter(SetCardAssociation.set_id == id_s).all()
@@ -662,17 +661,10 @@ async def get_game_info(game_id: int, db: Session = Depends(get_db)):
             card = db.query(Card).filter(Card.id == i.card_id).first()
             for h in card.hashtags.split(','):
                 list_of_all_hashtags.add(h)
-    for id_s in id_set_list:
-        cards = db.query(SetCardAssociation).filter(SetCardAssociation.set_id == id_s).all()
-        for i in cards:
-            card = db.query(Card).filter(Card.id == i.card_id).first()
-            for h in card.hashtags.split(','):
-                list_of_hashtags_in_game.add(h)
-
     for h in list_of_all_hashtags:
         hash_list.append({
             "name": h,
-            "in_game": h in list_of_hashtags_in_game
+            "in_game": h in game.hashtags.split(',')
         })
     game_data["hashtags"] = hash_list
     return game_data
