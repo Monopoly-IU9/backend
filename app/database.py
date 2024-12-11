@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-DATABASE_URL = "sqlite:///./test.db"  # Важно, что база данных будет сохраняться в файл
+DATABASE_URL = "mysql+pymysql://u2575528_default:xC1hJ2gA4deT0cF2@localhost/u2575528_default"  # Важно, что база данных будет сохраняться в файл
 
 # Создаем подключение к базе данных
 engine = create_engine(DATABASE_URL)
